@@ -37,16 +37,17 @@ The work plan is [01-data-pipeline.md](./01-data-pipeline.md). Read it before st
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/datascraper/taxonomy.py`                      | Shared normalization: category, labels, skin-type synonym mapping, enums. Merchant-agnostic. **Extend this rather than duplicating rules in a scraper.** |
 | `src/datascraper/sources/v1/<merchant>/`           | Full discovery sources: extractors, single-product scraper, CSV batch orchestration, and README.                                                         |
-| `src/datascraper/sources/v2/<merchant>/`           | Slim refresh sources; currently extracts merchant price only.                                                                                           |
+| `src/datascraper/sources/v2/<merchant>/`           | Stored-URL price refresh sources; Amazon also verifies product identity and Prime eligibility.                                                            |
+| `src/datascraper/sources/v3/<merchant>/`           | Offer discovery for existing Clearup products, separate from stored-URL price refresh.                                                                  |
 | `src/datascraper/models.py`                        | Shared `Product` type and single `OUTPUT_FIELDS` definition.                                                                                             |
-| `src/datascraper/cli.py`                           | `datascraper scrape`, `discover`, `compare`, `refresh prices`, `enrich skin-types`, `images ingest`, and `backfill images` command-line interface.             |
+| `src/datascraper/cli.py`                           | `datascraper scrape`, `discover yesstyle|amazon-offers`, `compare`, `refresh prices`, `enrich skin-types`, `images ingest`, and `backfill images`.              |
 | `src/datascraper/pipeline/refresh.py`              | Read-only Clearup listing refresh and four-column refresh CSV.                                                                                            |
 | `src/datascraper/pipeline/images.py`               | Image download, WebP conversion, R2 ingest, and resumable CSV transformation.                                                                            |
 | `src/datascraper/storage/`                         | PostgreSQL read access and Cloudflare R2 client using its S3-compatible API.                                                                              |
 | `inputs/`, `outputs/`                              | Data (gitignored). Inputs contain maintained seeds, legacy inputs, and references. Outputs contain the catalog, refreshes, progress, and per-run artifacts. |
 | `docs/`, `extra/`                                  | Gitignored scratch notes and sample HTML. Not authoritative; don't commit to them.                                                                       |
 
-Layering: discovery CLI → v1 merchant batch orchestrator → v1 single-product scraper → extractors → `datascraper.taxonomy`; refresh CLI → refresh pipeline → v2 price scraper/extractor. Extractors don't navigate or do unrelated I/O.
+Layering: discovery CLI → merchant batch pipeline → source-specific browser scraper → extractors → `datascraper.taxonomy`; refresh CLI → refresh pipeline → v2 price scraper/extractor. V3 discovers and verifies merchant offers for existing products; v2 refreshes prices from saved URLs. Extractors don't do unrelated I/O.
 
 New data sources (affiliate feeds, Shopify JSON, Open Beauty Facts) should follow the same shape: a source-specific module that produces the common output row, reusing `datascraper.taxonomy`. Put them in their own folder under `src/datascraper/sources/` with a short README.
 

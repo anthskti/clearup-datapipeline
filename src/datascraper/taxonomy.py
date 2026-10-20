@@ -224,6 +224,26 @@ def normalize_product_capacity(value: str | None) -> str:
     return re.sub(r"\s+", "", (value or "").casefold())
 
 
+_SIZE_RE = re.compile(
+    r"(?<![\d.])(\d+(?:\.\d+)?)\s*(fl\.?\s*oz|oz|ml|grams?|g|pads?|patch(?:es)?)\b", re.IGNORECASE
+)
+_SIZE_UNITS = (("oz", "oz"), ("ml", "ml"), ("g", "g"), ("pad", "pad"), ("patch", "patch"))
+
+
+def _sizes(text: str) -> set[tuple[float, str]]:
+    found = set()
+    for number, unit in _SIZE_RE.findall(text or ""):
+        unit = unit.casefold().replace(" ", "").replace(".", "")
+        found.add((float(number), next(u for prefix, u in _SIZE_UNITS if unit.endswith(prefix) or unit.startswith(prefix))))
+    return found
+
+
+def capacity_in_text(capacity: str | None, text: str | None) -> bool:
+    """True if the capacity (e.g. '55ml', '30 pads', '1.85 fl oz') appears in text in the same unit."""
+    wanted = _sizes(capacity or "")
+    return bool(wanted) and wanted <= _sizes(text or "")
+
+
 # Helper function to check if any keyword is in the text.
 def _text_has_any(text: str, keywords: tuple[str, ...]) -> bool: # Since our tuple can contain any number of strings, [str, ...]
     return any(keyword in text for keyword in keywords)

@@ -44,7 +44,7 @@ def main() -> None:
                 "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO"
             )
 
-    discover = commands.add_parser("discover", help="Discover product URLs from retailer listings")
+    discover = commands.add_parser("discover", help="Discover retailer product URLs and offers")
     discover_commands = discover.add_subparsers(dest="discover_source", required=True)
     yesstyle_discover = discover_commands.add_parser(
         "yesstyle", help="Discover YesStyle product URLs from brand listing pages"
@@ -56,6 +56,22 @@ def main() -> None:
     yesstyle_discover.add_argument("--dataset-id", help="Reuse a saved Apify dataset (one brand row only)")
     yesstyle_discover.add_argument("--wait-timeout", type=float, default=3600)
     yesstyle_discover.add_argument(
+        "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO"
+    )
+    amazon_discover = discover_commands.add_parser(
+        "amazon-offers", help="Find Prime-eligible Amazon.ca offers for Clearup products"
+    )
+    amazon_discover.add_argument(
+        "--input", type=Path, help="Optional brand,name,capacity worklist CSV"
+    )
+    amazon_discover.add_argument("--brand", help="Search products for one brand (case-insensitive)")
+    amazon_discover.add_argument(
+        "--limit", type=int, help="Search at most this many unlinked products"
+    )
+    amazon_discover.add_argument("--max-candidates", type=int, default=5)
+    amazon_discover.add_argument("--delay", type=float, default=3.0)
+    amazon_discover.add_argument("--output-prefix", type=Path, required=True)
+    amazon_discover.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO"
     )
 
@@ -107,6 +123,32 @@ def main() -> None:
     backfill_images.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
+    if args.command == "discover" and args.discover_source == "amazon-offers":
+        from datascraper.sources.v3.amazon.discover import discover_amazon_offers
+
+        try:
+            _configure_run_logging(args.output_prefix.parent / "run.log", args.log_level)
+            logging.getLogger(__name__).info(
+                "Starting Amazon.ca offer discovery: brand=%s limit=%s output_prefix=%s",
+                args.brand or "all brands",
+                args.limit,
+                args.output_prefix,
+            )
+            asyncio.run(
+                discover_amazon_offers(
+                    output_prefix=args.output_prefix,
+                    brand=args.brand,
+                    limit=args.limit,
+                    input_csv=args.input,
+                    max_candidates=args.max_candidates,
+                    delay=args.delay,
+                )
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Amazon.ca offer discovery failed")
+            parser.exit(1, f"datascraper: error: {exc}\n")
+        return
+
     if args.command == "discover":
         from datascraper.sources.v1.yesstyle.discover import discover_yesstyle_urls
 

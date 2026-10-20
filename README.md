@@ -8,7 +8,8 @@ Currently focuses on these retail stores:
 
 1. [YesStyle v1](src/datascraper/sources/v1/yesstyle/README.md) — full discovery scraper; drawback: skin types are inconsistent.
 2. [Sephora v1](src/datascraper/sources/v1/sephora/README.md) — full discovery scraper; drawback: doesn't state country.
-3. [YesStyle v2](src/datascraper/sources/v2/yesstyle/README.md) and [Sephora v2](src/datascraper/sources/v2/sephora/README.md) — price-only refresh scrapers.
+3. [YesStyle v2](src/datascraper/sources/v2/yesstyle/README.md), [Sephora v2](src/datascraper/sources/v2/sephora/README.md), and [Amazon.ca v2](src/datascraper/sources/v2/amazon/README.md) — stored-URL price refresh scrapers.
+4. [Amazon.ca v3](src/datascraper/sources/v3/amazon/README.md) — offer discovery for existing Clearup products.
 
 General Pipeline:
 
@@ -49,6 +50,16 @@ Both YesStyle commands write terminal logs and append to `run.log` beside their 
 
 The URL CSV is a visible checkpoint: inspect or edit it before scraping, and rerun the scraper independently. The crawl limit includes listing and product pages, so check the discovered/scraped row count against the brand listing. The comparison writes `_new.csv`, `_existing.csv`, and `_review.csv`; only `_new.csv` has the normal Clearup product import fields. Review the other two before importing, and make sure `outputs/catalog/master.csv` is current.
 
+## Discover Amazon.ca offers for existing products
+
+Amazon discovery reads a product worklist through the read-only Clearup database connection, skips products that already have an Amazon.ca link, then uses Playwright Chromium to search Amazon.ca once per product and match the top 5 result cards on brand, name, and size. Set `CLEARUP_DATABASE_URL` and `CLEARUP_DB_CA_CERT` as described under price refresh. Bound each run with `--brand`, `--limit`, or both:
+
+```bash
+uv run datascraper discover amazon-offers --brand "SKIN1004" --limit 5 --output-prefix outputs/runs/amazon_skin1004/discovery
+```
+
+Each run writes `_offers.csv`, `_review.csv`, `_candidates.csv`, and `_unmatched.csv`, and updates the cumulative log `outputs/catalog/amazon_offers_master.csv`. Review `review` rows by hand and approve them by editing the master (see the [v3 README](src/datascraper/sources/v3/amazon/README.md)). Discovery does not set stock; `refresh prices` owns price and stock afterwards.
+
 ## Enrich product skin types locally
 
 Install and start Ollama, then download the default model once:
@@ -78,7 +89,7 @@ export CLEARUP_DB_CA_CERT='/path/to/supabase-prod-ca.crt'
 uv run datascraper refresh prices --limit 5 --output outputs/refresh/price_refresh.csv
 ```
 
-Use the exact session-pooler connection details from Supabase and a role limited to `SELECT` on `products`, `product_merchants`, and `merchants`. The connection verifies TLS and the server certificate/hostname using the configured CA. If `.env` is used, source it in the shell before running the command. The CSV columns are `brand,name,price,merchant`; failed, unsupported, and duplicate brand/name/merchant listings are omitted and counted in the log, so a failed scrape cannot replace a stored price. YesStyle and Sephora are currently supported; Sephora may block automated requests.
+Use the exact session-pooler connection details from Supabase and a role limited to `SELECT` on `products`, `product_merchants`, and `merchants`. The connection verifies TLS and the server certificate/hostname using the configured CA. If `.env` is used, source it in the shell before running the command. The CSV columns are `brand,name,price,merchant`; failed, unsupported, and duplicate brand/name/merchant listings are omitted and counted in the log, so a failed scrape cannot replace a stored price. YesStyle, Sephora, and Amazon.ca are supported; Amazon.ca refresh also checks product identity and Prime eligibility.
 
 ## Product images
 

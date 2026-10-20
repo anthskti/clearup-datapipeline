@@ -49,6 +49,16 @@ The existing and review files show the scraped product fields first, followed by
 
 ## Other useful commands
 
+Search a small brand batch for Prime-eligible Amazon.ca offers (uses the read-only Clearup database connection):
+
+```bash
+uv run datascraper discover amazon-offers \
+  --brand "SKIN1004" --limit 5 \
+  --output-prefix outputs/runs/amazon_skin1004/discovery
+```
+
+Inspect the generated `_offers.csv` and `_review.csv` before importing the accepted offers into Clearup. `_candidates.csv` records the checked Amazon result pages; `_unmatched.csv` lists products with no verified offer.
+
 Infer skin types for a small sample (requires Ollama running locally):
 
 ```bash
@@ -63,6 +73,7 @@ See available commands and options:
 ```bash
 uv run datascraper --help
 uv run datascraper discover yesstyle --help
+uv run datascraper discover amazon-offers --help
 uv run datascraper scrape yesstyle --help
 uv run datascraper compare catalog --help
 ```

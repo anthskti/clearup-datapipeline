@@ -14,6 +14,8 @@ REFRESH_FIELDS = ["brand", "name", "price", "merchant"]
 MERCHANT_ALIASES = {
     "yesstyle": "yesstyle",
     "sephora": "sephora",
+    "amazon.ca": "amazon.ca",
+    "amazon": "amazon.ca",
 }
 
 
@@ -38,7 +40,17 @@ async def _refresh_row(
     async with semaphore:
         merchant = row["merchant"].strip()
         try:
-            price = _usable_price(await scraper.scrape_price(row["url"]))
+            if merchant.casefold() in {"amazon.ca", "amazon"}:
+                price = _usable_price(
+                    await scraper.scrape_price(
+                        row["url"],
+                        expected_brand=row["brand"],
+                        expected_name=row["name"],
+                        expected_capacity=row.get("capacity", ""),
+                    )
+                )
+            else:
+                price = _usable_price(await scraper.scrape_price(row["url"]))
             if price is None:
                 logger.warning("No usable price for listing %s", row["product_merchant_id"])
                 return "failed", None
@@ -71,10 +83,17 @@ async def _refresh_merchant_rows(
         from datascraper.sources.v2.yesstyle.scraper import YesStylePriceScraper
 
         scraper_type = YesStylePriceScraper
-    else:
+    elif source == "sephora":
         from datascraper.sources.v2.sephora.scraper import SephoraPriceScraper
 
         scraper_type = SephoraPriceScraper
+    elif source == "amazon.ca":
+        from datascraper.sources.v2.amazon.scraper import AmazonPriceScraper
+
+        scraper_type = AmazonPriceScraper
+    else:
+        logger.error("No price refresh scraper registered for %s", source)
+        return [("failed", None) for _ in rows]
 
     semaphore = asyncio.Semaphore(max(1, max_workers))
     try:
