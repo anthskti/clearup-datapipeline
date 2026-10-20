@@ -4,13 +4,14 @@ import asyncio
 import csv
 import logging
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from datascraper.storage.postgres import fetch_product_merchants
 
 logger = logging.getLogger(__name__)
 
-REFRESH_FIELDS = ["brand", "name", "price", "merchant"]
+REFRESH_FIELDS = ["brand", "name", "price", "merchant", "stock"]
 MERCHANT_ALIASES = {
     "yesstyle": "yesstyle",
     "sephora": "sephora",
@@ -40,26 +41,18 @@ async def _refresh_row(
     async with semaphore:
         merchant = row["merchant"].strip()
         try:
-            if merchant.casefold() in {"amazon.ca", "amazon"}:
-                price = _usable_price(
-                    await scraper.scrape_price(
-                        row["url"],
-                        expected_brand=row["brand"],
-                        expected_name=row["name"],
-                        expected_capacity=row.get("capacity", ""),
-                    )
-                )
-            else:
-                price = _usable_price(await scraper.scrape_price(row["url"]))
+            price = _usable_price(await scraper.scrape_price(row["url"]))
             if price is None:
                 logger.warning("No usable price for listing %s", row["product_merchant_id"])
                 return "failed", None
 
             return "processed", {
+                "product_merchant_id": row["product_merchant_id"],
                 "brand": row["brand"],
                 "name": row["name"],
                 "price": price,
                 "merchant": merchant,
+                "stock": "false" if price == "-1" else "true",
             }
         except Exception as exc:
             logger.error(
@@ -109,15 +102,52 @@ async def _refresh_merchant_rows(
         return [("failed", None) for _ in rows]
 
 
+def _master_rows() -> list[dict[str, str]]:
+    """Matched Amazon.ca links from the v3 master, shaped like Clearup listings."""
+    from datascraper.sources.v3.amazon.discover import MASTER_PATH, _read_csv
+
+    return [
+        {
+            "product_merchant_id": row["productId"],
+            "brand": row["brand"],
+            "name": row["name"],
+            "capacity": row["capacity"],
+            "price": row["price"],
+            "url": row["website"],
+            "merchant": row["merchant"],
+        }
+        for row in _read_csv(MASTER_PATH)
+        if row["status"] == "matched" and row["website"]
+    ]
+
+
+def _update_master(report_rows: list[dict[str, str]]) -> None:
+    """Write refreshed prices back to the v3 master; failed refreshes are not in report_rows."""
+    from datascraper.sources.v3.amazon.discover import MASTER_FIELDS, MASTER_PATH, _read_csv, _write_csv
+
+    master = {row["productId"]: row for row in _read_csv(MASTER_PATH)}
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for report in report_rows:
+        entry = master.get(report["product_merchant_id"])
+        if entry and entry["price"] != report["price"]:
+            logger.info(
+                "Master price for %s: %s -> %s", entry["name"], entry["price"] or "(none)", report["price"]
+            )
+            entry["price"] = report["price"]
+            entry["updatedAt"] = now
+    _write_csv(MASTER_PATH, MASTER_FIELDS, list(master.values()))
+
+
 async def refresh_prices(
     output_csv: Path,
     limit: int | None = None,
     max_workers: int = 1,
     delay_between_requests: float = 5.0,
+    from_master: bool = False,
 ) -> Counter[str]:
     """Read candidates, refresh their prices, and write successful rows only."""
-    candidates = fetch_product_merchants(limit=limit)
-    logger.info("Loaded %d product-merchant rows from Clearup", len(candidates))
+    candidates = _master_rows()[:limit] if from_master else fetch_product_merchants(limit=limit)
+    logger.info("Loaded %d product-merchant rows from %s", len(candidates), "master" if from_master else "Clearup")
 
     identities: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
     for row in candidates:
@@ -171,9 +201,11 @@ async def refresh_prices(
 
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with output_csv.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=REFRESH_FIELDS)
+        writer = csv.DictWriter(file, fieldnames=REFRESH_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(successful_rows)
+    if from_master:
+        _update_master(successful_rows)
 
     logger.info(
         "Price refresh complete: processed=%d skipped=%d failed=%d; output=%s",

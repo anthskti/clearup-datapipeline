@@ -37,7 +37,7 @@ The work plan is [01-data-pipeline.md](./01-data-pipeline.md). Read it before st
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/datascraper/taxonomy.py`                      | Shared normalization: category, labels, skin-type synonym mapping, enums. Merchant-agnostic. **Extend this rather than duplicating rules in a scraper.** |
 | `src/datascraper/sources/v1/<merchant>/`           | Full discovery sources: extractors, single-product scraper, CSV batch orchestration, and README.                                                         |
-| `src/datascraper/sources/v2/<merchant>/`           | Stored-URL price refresh sources; Amazon also verifies product identity and Prime eligibility.                                                            |
+| `src/datascraper/sources/v2/<merchant>/`           | Stored-URL price refresh sources; Amazon reads the price tag only and returns `-1` when out of stock.                                                     |
 | `src/datascraper/sources/v3/<merchant>/`           | Offer discovery for existing Clearup products, separate from stored-URL price refresh.                                                                  |
 | `src/datascraper/models.py`                        | Shared `Product` type and single `OUTPUT_FIELDS` definition.                                                                                             |
 | `src/datascraper/cli.py`                           | `datascraper scrape`, `discover yesstyle|amazon-offers`, `compare`, `refresh prices`, `enrich skin-types`, `images ingest`, and `backfill images`.              |

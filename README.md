@@ -81,7 +81,7 @@ For later runs, use the latest enriched/import-export CSV as `--input`; reusing 
 
 ## Refresh merchant prices
 
-The refresh command reads merchant listings from Clearup using a dedicated read-only PostgreSQL role, then writes successful price results to a separate four-column CSV. It does not update Clearup:
+The refresh command reads merchant listings from Clearup using a dedicated read-only PostgreSQL role, then writes successful price results to a separate five-column CSV. It does not update Clearup:
 
 ```bash
 export CLEARUP_DATABASE_URL='postgresql://...session-pooler-connection...'
@@ -89,7 +89,9 @@ export CLEARUP_DB_CA_CERT='/path/to/supabase-prod-ca.crt'
 uv run datascraper refresh prices --limit 5 --output outputs/refresh/price_refresh.csv
 ```
 
-Use the exact session-pooler connection details from Supabase and a role limited to `SELECT` on `products`, `product_merchants`, and `merchants`. The connection verifies TLS and the server certificate/hostname using the configured CA. If `.env` is used, source it in the shell before running the command. The CSV columns are `brand,name,price,merchant`; failed, unsupported, and duplicate brand/name/merchant listings are omitted and counted in the log, so a failed scrape cannot replace a stored price. YesStyle, Sephora, and Amazon.ca are supported; Amazon.ca refresh also checks product identity and Prime eligibility.
+Use the exact session-pooler connection details from Supabase and a role limited to `SELECT` on `products`, `product_merchants`, and `merchants`. The connection verifies TLS and the server certificate/hostname using the configured CA. If `.env` is used, source it in the shell before running the command. The CSV columns are `brand,name,price,merchant,stock`; failed, unsupported, and duplicate brand/name/merchant listings are omitted and counted in the log, so a failed scrape cannot replace a stored price. `stock` is `true` whenever a price was found. Amazon.ca reads the price from the saved product URL; a loaded page with no price is reported as `price=-1,stock=false` (out of stock), and Clearup should treat `-1` as no price. YesStyle, Sephora, and Amazon.ca are supported.
+
+Before the Amazon.ca links are imported into Clearup, `uv run datascraper refresh prices --master --limit 5 --output outputs/refresh/amazon_refresh.csv` refreshes the `matched` rows of `outputs/catalog/amazon_offers_master.csv` instead of reading the database, and writes the new prices (and `updatedAt`) back to the master as a log.
 
 ## Product images
 

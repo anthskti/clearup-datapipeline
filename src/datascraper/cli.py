@@ -89,6 +89,11 @@ def main() -> None:
     prices.add_argument("--limit", type=int, help="Refresh at most this many Clearup listings")
     prices.add_argument("--workers", type=int, default=1)
     prices.add_argument("--delay", type=float, default=5.0)
+    prices.add_argument(
+        "--master",
+        action="store_true",
+        help="Refresh matched Amazon.ca links from outputs/catalog/amazon_offers_master.csv instead of Clearup",
+    )
 
     enrich = commands.add_parser("enrich", help="Enrich product CSV data locally")
     enrich_commands = enrich.add_subparsers(dest="enrich_type", required=True)
@@ -196,6 +201,7 @@ def main() -> None:
                     limit=args.limit,
                     max_workers=max(1, args.workers),
                     delay_between_requests=max(0.0, args.delay),
+                    from_master=args.master,
                 )
             )
         except Exception as exc:

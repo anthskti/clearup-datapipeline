@@ -49,7 +49,7 @@ The existing and review files show the scraped product fields first, followed by
 
 ## Other useful commands
 
-Search a small brand batch for Prime-eligible Amazon.ca offers (uses the read-only Clearup database connection):
+Search a small brand batch for Amazon.ca offers (uses the read-only Clearup database connection):
 
 ```bash
 uv run datascraper discover amazon-offers \
@@ -57,7 +57,21 @@ uv run datascraper discover amazon-offers \
   --output-prefix outputs/runs/amazon_skin1004/discovery
 ```
 
-Inspect the generated `_offers.csv` and `_review.csv` before importing the accepted offers into Clearup. `_candidates.csv` records the checked Amazon result pages; `_unmatched.csv` lists products with no verified offer.
+Inspect the generated `_offers.csv` and `_review.csv` before importing. `_candidates.csv` lists every Amazon result card checked; `_unmatched.csv` lists products with no match. All runs also update `outputs/catalog/amazon_offers_master.csv`; approve a `review` row by setting its `status` to `matched` and `source` to `manual` there.
+
+Refresh prices for the matched Amazon links in the master (writes the new prices back to the master and a refresh CSV; `price=-1,stock=false` means out of stock):
+
+```bash
+uv run datascraper refresh prices --master --limit 5 \
+  --output outputs/refresh/amazon_refresh.csv
+```
+
+Refresh prices for every merchant listing already in Clearup (needs `CLEARUP_DATABASE_URL` and `CLEARUP_DB_CA_CERT` set; read-only, writes only the CSV):
+
+```bash
+uv run datascraper refresh prices --limit 5 \
+  --output outputs/refresh/price_refresh.csv
+```
 
 Infer skin types for a small sample (requires Ollama running locally):
 
@@ -74,6 +88,7 @@ See available commands and options:
 uv run datascraper --help
 uv run datascraper discover yesstyle --help
 uv run datascraper discover amazon-offers --help
+uv run datascraper refresh prices --help
 uv run datascraper scrape yesstyle --help
 uv run datascraper compare catalog --help
 ```
