@@ -1,6 +1,6 @@
 # Product Data Scraper for Clearup
 
-Quick command reference: [CHEATSHEET.md](CHEATSHEET.md).
+Quick command reference: [CHEATSHEET.md](CHEATSHEET.md). Amazon offer flow and CSV handoff: [PHASE5_AMAZON_PIPELINE.md](PHASE5_AMAZON_PIPELINE.md).
 
 This repository is a compliment to [Clearup.skin](https://www.clearup.skin)([repo](https://github.com/anthskti/Clearup)).
 
