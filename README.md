@@ -79,6 +79,8 @@ Inference is restricted to `ALL_SKIN_TYPES`; insufficient evidence produces `N/A
 
 For later runs, use the latest enriched/import-export CSV as `--input`; reusing the original source CSV (without `skinTypeSource`) will intentionally trigger inference again. Keep the original CSV separately to compare model results with the regex values.
 
+Once the legacy catalog is enriched, keep `outputs/catalog/master.csv` as the ongoing full catalog. Append reviewed new products with blank `skinTypeSource`, run enrichment to a separate candidate CSV, and promote that candidate after review. The [cheatsheet](CHEATSHEET.md) shows the full command sequence.
+
 ## Refresh merchant prices
 
 The refresh command reads merchant listings from Clearup using a dedicated read-only PostgreSQL role, then writes successful price results to a separate five-column CSV. It does not update Clearup:
@@ -109,11 +111,13 @@ The dry run lists planned object keys without downloading or uploading images an
 Backfill the merged dataset (resumable; progress is stored under ignored `outputs/`):
 
 ```bash
-uv run datascraper backfill images --input outputs/catalog/master.csv --output outputs/catalog/master_r2.csv --dry-run
-uv run datascraper backfill images --input outputs/catalog/master.csv --output outputs/catalog/master_r2.csv
+uv run datascraper backfill images --input outputs/catalog/master_skin_types.csv --output outputs/catalog/r2_backfill.csv --dry-run
+uv run datascraper backfill images --input outputs/catalog/master_skin_types.csv --output outputs/catalog/r2_backfill.csv
 ```
 
 R2 product keys use a SHA-256 digest of the trimmed, lowercased `brand::name` identity, followed by the image position and source-URL digest. Scraper CSVs retain their original merchant image URLs; the derived import CSV contains R2 URLs and only includes successful rows with images. Unsuccessful and imageless rows are skipped so they cannot clear existing images. Ingest continues through the batch after an image error and logs `processed`, `skipped`, and `failed` row counts; if any eligible row fails, it does not write a new output CSV. Completed uploads are resumable on rerun.
+
+To update the complete catalog with an image ingest CSV, run `uv run datascraper catalog apply-images --input outputs/catalog/master_skin_types.csv --images outputs/catalog/r2_backfill.csv --output outputs/catalog/master_candidate.csv`. It copies only `imageUrls` on unique, case-insensitive brand/name matches and retains every input row. Duplicate matches stay unchanged for manual review. In future, ingest images from new-product batches rather than passing an R2-backed master through image ingest again.
 
 Author: Anthony Pham
 Created: February 17, 2026

@@ -82,6 +82,13 @@ def main() -> None:
     catalog.add_argument("--catalog", type=Path, required=True)
     catalog.add_argument("--output-prefix", type=Path, required=True)
 
+    catalog_commands = commands.add_parser("catalog", help="Maintain the local product catalog")
+    catalog_actions = catalog_commands.add_subparsers(dest="catalog_action", required=True)
+    apply_images = catalog_actions.add_parser("apply-images", help="Apply R2 image URLs to a full catalog")
+    apply_images.add_argument("--input", type=Path, required=True)
+    apply_images.add_argument("--images", type=Path, required=True)
+    apply_images.add_argument("--output", type=Path, required=True)
+
     refresh = commands.add_parser("refresh", help="Refresh prices for Clearup merchant listings")
     refresh_commands = refresh.add_subparsers(dest="refresh_type", required=True)
     prices = refresh_commands.add_parser("prices", help="Write refreshed merchant prices to CSV")
@@ -187,6 +194,15 @@ def main() -> None:
                 catalog_csv=args.catalog,
                 output_prefix=args.output_prefix,
             )
+        except Exception as exc:
+            parser.exit(1, f"datascraper: error: {exc}\n")
+        return
+
+    if args.command == "catalog":
+        from datascraper.pipeline.catalog import apply_image_urls
+
+        try:
+            apply_image_urls(args.input, args.images, args.output)
         except Exception as exc:
             parser.exit(1, f"datascraper: error: {exc}\n")
         return
